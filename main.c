@@ -66,8 +66,8 @@ int maxcount = 10;
 int buttonpress = 0;
 int row;
 int col;
-uint16_t COL_PINS[3] = {GPIO_PIN_0,GPIO_PIN_1,GPIO_PIN_2};
-uint16_t ROW_PINS[4] = {GPIO_PIN_4,GPIO_PIN_5,GPIO_PIN_6,GPIO_PIN_7};
+uint16_t COL_PINS[3] = {GPIO_PIN_0,GPIO_PIN_1,GPIO_PIN_8};
+uint16_t ROW_PINS[4] = {GPIO_PIN_7,GPIO_PIN_6,GPIO_PIN_5,GPIO_PIN_4};
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config	(void);
 void initGPIO(GPIO_TypeDef* GPIOx, uint16_t pins, uint16_t input);
@@ -105,16 +105,16 @@ int main(void)
 	__HAL_RCC_GPIOD_CLK_ENABLE();
 	
 	initGPIO(GPIOE, 0xFFFF, 0);
-	initGPIO(GPIOB, 0x0007, 1);//Used for the keypad
-	initGPIO(GPIOB, 0xFFF0, 0);
+	initGPIO(GPIOB, 0x0103, 1);//Used for the keypad
+	initGPIO(GPIOB, 0xFEF0, 0);
 	initGPIO(GPIOA, 0x9FFF, 0);//Used as a select signal
 	initGPIO(GPIOC, 0xFFFF, 0);//Used to control segments
 	initGPIO(GPIOD, 0xF000, 0);//Used to light up LEDs
 	//Initialize keypad rows
-	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_4,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_5,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_6,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_4,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_5,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_6,GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_RESET);
 	
   /* Initialize all configured peripherals */
 	
@@ -136,19 +136,6 @@ int main(void)
 		{
 			updateDisplay();
 			
-			// no 1s detected in col yet
-			if(!buttonpress) {
-				// scan all the cols
-				col = readKeypad(0);
-				if(col > 0)
-					buttonpress = 1;
-			}
-			// 1 detected in a col
-			else {
-				// some delay
-				// scan all the rows
-				row = readKeypad(col);
-			}
 		}
 		//Reads from accelerometer when data is ready
 		// also waits 1000000 ticks to make it slower/more readable
@@ -160,6 +147,25 @@ int main(void)
 			//reset tickcount
 			tickcount = 0;
 			
+			// no 1s detected in col yet
+			if(!buttonpress) {
+				// scan all the cols
+				col = readKeypad(0);
+				if(col > 0) {
+					buttonpress = 1;
+					row = readKeypad(col);
+					printf("row: %i, col: %i\n",row, col);
+				}
+				else printf("no press\n");
+			}
+			// 1 detected in a col
+			else {
+				// some delay
+				// scan all the rows
+				
+				buttonpress = 0;
+			}
+			
 			//Reads from accelerometer
 			LIS3DSH_ReadACC(axisAcceleration);
 			
@@ -169,7 +175,7 @@ int main(void)
 			// compute pitch and roll using new, calibrated values
 			computeAngles(calibratedAcc[0],calibratedAcc[1],calibratedAcc[2],systemAngles);
 			
-			printf("x-axis: %f \n", calibratedAcc[0]);
+			/*printf("x-axis: %f \n", calibratedAcc[0]);
 			printf("y-axis: %f \n", calibratedAcc[1]);
 			printf("z-axis: %f \n", calibratedAcc[2]);
 			
@@ -177,7 +183,7 @@ int main(void)
 			//computeAngles(axisAcceleration[0],axisAcceleration[1],axisAcceleration[2],systemAngles);
 			
 			printf("Picth: %f \n", systemAngles[1]);
-			printf("Roll: %f \n", systemAngles[0]);
+			printf("Roll: %f \n", systemAngles[0]);*/
 			//Reset interrupt flag
 			accelerometerInt = 0;
 			tick = 0;
@@ -192,33 +198,33 @@ int readKeypad(int rowColumn)
 	//rowColumn = 0 -> Column
 	if(rowColumn > 0)
 	{	
-		HAL_GPIO_WritePin(GPIOB,0x00F0,GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB,0x00F0,GPIO_PIN_SET);
 		for (i = 0; i < 4; i++) {
 			// set all rows except row i = 0, row i = 1
-			HAL_GPIO_WritePin(GPIOB,ROW_PINS[i],GPIO_PIN_SET);
-			if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, COL_PINS[rowColumn-1]))
-				return i+1;
 			HAL_GPIO_WritePin(GPIOB,ROW_PINS[i],GPIO_PIN_RESET);
+			if(GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOB, COL_PINS[rowColumn-1]))
+				return i+1;
+			HAL_GPIO_WritePin(GPIOB,ROW_PINS[i],GPIO_PIN_SET);
 		}		
-		return -1;
+		return 0;
 	}
 	
 	else
 	{		
-		if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0))
+		if(GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0))
 		{
 			return 1;
 		}
-		else if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1))
+		else if(GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1))
 		{
 			return 2;
 		}
-		else if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2))
+		else if(GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8))
 		{
 			return 3;
 		}
 		else {
-			return -1;
+			return 0;
 		}
 	}
 }
@@ -286,7 +292,7 @@ void initGPIO(GPIO_TypeDef* GPIOx, uint16_t pins, uint16_t input)
 	GPIOInit.Alternate = 0;	
 	GPIOInit.Pin = pins;
 	GPIOInit.Speed = GPIO_SPEED_FREQ_MEDIUM;
-	GPIOInit.Pull = GPIO_PULLDOWN;
+	GPIOInit.Pull = GPIO_PULLUP;
 	if(!input)
 		GPIOInit.Mode = GPIO_MODE_OUTPUT_PP;
 	else
