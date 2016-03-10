@@ -63,6 +63,11 @@ float axisAcceleration[3];
 float calibratedAcc[3];
 int tickcount;
 int maxcount = 10;
+int buttonpress = 0;
+int row;
+int col;
+uint16_t COL_PINS[3] = {GPIO_PIN_0,GPIO_PIN_1,GPIO_PIN_2};
+uint16_t ROW_PINS[4] = {GPIO_PIN_4,GPIO_PIN_5,GPIO_PIN_6,GPIO_PIN_7};
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config	(void);
 void initGPIO(GPIO_TypeDef* GPIOx, uint16_t pins, uint16_t input);
@@ -70,6 +75,7 @@ void computeAngles(double Ax, double Ay,double Az, float* angles);
 void storeCalibrationMatrix(void);
 void applyMatrix(float Ax, float Ay, float Az);
 void updateDisplay(void);
+int readKeypad(int rowColumn);
 
 int main(void)
 {	
@@ -104,6 +110,11 @@ int main(void)
 	initGPIO(GPIOA, 0x9FFF, 0);//Used as a select signal
 	initGPIO(GPIOC, 0xFFFF, 0);//Used to control segments
 	initGPIO(GPIOD, 0xF000, 0);//Used to light up LEDs
+	//Initialize keypad rows
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_4,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_5,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_6,GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_SET);
 	
   /* Initialize all configured peripherals */
 	
@@ -124,6 +135,20 @@ int main(void)
 		if(tick)
 		{
 			updateDisplay();
+			
+			// no 1s detected in col yet
+			if(!buttonpress) {
+				// scan all the cols
+				col = readKeypad(0);
+				if(col > 0)
+					buttonpress = 1;
+			}
+			// 1 detected in a col
+			else {
+				// some delay
+				// scan all the rows
+				row = readKeypad(col);
+			}
 		}
 		//Reads from accelerometer when data is ready
 		// also waits 1000000 ticks to make it slower/more readable
@@ -160,6 +185,43 @@ int main(void)
 	}
 }
 
+int readKeypad(int rowColumn)
+{
+	int i = 0;
+	//rowColumn = 1-3 -> want to read Row
+	//rowColumn = 0 -> Column
+	if(rowColumn > 0)
+	{	
+		HAL_GPIO_WritePin(GPIOB,0x00F0,GPIO_PIN_RESET);
+		for (i = 0; i < 4; i++) {
+			// set all rows except row i = 0, row i = 1
+			HAL_GPIO_WritePin(GPIOB,ROW_PINS[i],GPIO_PIN_SET);
+			if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, COL_PINS[rowColumn-1]))
+				return i+1;
+			HAL_GPIO_WritePin(GPIOB,ROW_PINS[i],GPIO_PIN_RESET);
+		}		
+		return -1;
+	}
+	
+	else
+	{		
+		if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0))
+		{
+			return 1;
+		}
+		else if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1))
+		{
+			return 2;
+		}
+		else if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2))
+		{
+			return 3;
+		}
+		else {
+			return -1;
+		}
+	}
+}
 //Sets ad reset each select pin as well as the pins for each segement
 //Also insert delay such that digits appear as constant to the eye
 void updateDisplay()
