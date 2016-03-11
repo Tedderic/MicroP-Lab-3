@@ -40,6 +40,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_it.h"
+#include "sevenSegment.h"
 
 /** @addtogroup STM32F4xx_HAL_Examples
   * @{
@@ -50,10 +51,14 @@
   */
 int accelerometerInt = 0;
 int tick = 0;
+int i = 0;
+extern TIM_HandleTypeDef timerHandle;
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef timer;
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -185,6 +190,12 @@ void EXTI0_IRQHandler(void)
 {
 	accelerometerInt = 1;
 	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+}
+
+void TIM3_IRQHandler(void)
+{
+	updateDisplay(i++%4);
+	HAL_TIM_IRQHandler(&timerHandle);	
 }
 /**
   * @}

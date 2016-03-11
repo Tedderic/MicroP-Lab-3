@@ -1,0 +1,1 @@
+void updateDisplay(int display);
